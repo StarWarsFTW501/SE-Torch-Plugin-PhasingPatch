@@ -12,43 +12,56 @@ using Sandbox.Game.Entities;
 using VRageMath;
 using VRage.Game.Models;
 using TorchPlugin;
+using Sandbox;
 
 namespace ClientPlugin
 {
     [HarmonyPatch]
     public class PhasingGamePatches
     {
-        readonly static FieldInfo _missileCollisionPointInfo = typeof(MyMissile).GetField("m_collisionPoint", BindingFlags.Instance | BindingFlags.NonPublic);
-        readonly static FieldInfo _missileCollisionNormalInfo = typeof(MyMissile).GetField("m_collisionNormal", BindingFlags.Instance | BindingFlags.NonPublic);
-        readonly static FieldInfo _missileCollidedEntityInfo = typeof(MyMissile).GetField("m_collidedEntity", BindingFlags.Instance | BindingFlags.NonPublic);
-
-
         [HarmonyPostfix]
         [HarmonyPatch(typeof(MyMissile), "OnContactStart")]
         public static void Postfix_MyMissile_OnContactStart(MyMissile __instance, ref MyPhysics.MyContactPointEvent value)
         {
-            if (Plugin.Instance.Config.Enabled)
+            if (Plugin.Instance.Config.Phasing)
             {
-                MyEntity collidedEntity = (MyEntity)_missileCollidedEntityInfo.GetValue(__instance);
-
-                // Only perform patch for hits on grids
-                if (collidedEntity != null && collidedEntity is MyCubeGrid grid)
-                {
-                    // Obtain missile position in the current tick and the collision point given by
-                    Vector3D missilePosition = __instance.PositionComp.GetPosition();
-                    Vector3D detectedCollisionPoint = (Vector3D)_missileCollisionPointInfo.GetValue(__instance);
-
-                    LineD collisionRay = new LineD(missilePosition, detectedCollisionPoint);
-
-
-                    MyIntersectionResultLineTriangleEx? intersectedTriangle;
-                    if (grid.GetIntersectionWithLine(ref collisionRay, out intersectedTriangle))
-                    {
-                        _missileCollisionPointInfo.SetValue(__instance, intersectedTriangle.Value.IntersectionPointInWorldSpace);
-                        _missileCollisionNormalInfo.SetValue(__instance, intersectedTriangle.Value.NormalInWorldSpace);
-                    }
-                }
+                MyPatchUtilities.InitiatePhasingFix(__instance);
             }
+        }
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(MyMissile), "HitEntity")]
+        public static void Prefix_MyMissile_HitEntity(MyMissile __instance)
+        {
+            if (Plugin.Instance.Config.Phasing)
+            {
+                MyPatchUtilities.CompletePhasingFix(__instance);
+            }
+        }
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(MyMissile), "HitGrid")]
+        public static bool Prefix_MyMissile_HitGrid(MyMissile __instance, MyCubeGrid grid, Vector3D nextPosition)
+        {
+            if (Plugin.Instance.Config.Damage)
+            {
+                // Replace single-grid damage application with our own
+
+                MyPatchUtilities.HitSingleGridWithMissile(__instance, grid, nextPosition);
+                return false;
+            }
+            return true;
+        }
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(MyMissile), "HitMultipleGrids")]
+        public static bool Prefix_MyMissile_HitMultipleGrids(MyMissile __instance, List<MyLineSegmentOverlapResult<MyEntity>> hits, Vector3D nextPosition)
+        {
+            if (Plugin.Instance.Config.Damage)
+            {
+                // Replace multi-grid damage application with our own
+
+                MyPatchUtilities.HitMultipleGridsWithMissile(__instance, hits, nextPosition);
+                return false;
+            }
+            return true;
         }
     }
 }

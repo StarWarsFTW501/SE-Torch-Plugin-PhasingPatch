@@ -1,3 +1,4 @@
+using Sandbox.Engine.Utils;
 using Shared.Config;
 using Shared.Plugin;
 using System.Collections.Generic;
@@ -21,19 +22,16 @@ namespace TorchPlugin
         // TODO: Implement subcommands as needed
         private void RespondWithHelp()
         {
-            Respond("SePhasingPatch commands:");
-            Respond("  !phasingpatch help");
-            Respond("  !phasingpatch enabled [Boolean]");
-            Respond("    Checks or changes the state of the plugin");
-        }
-
-        private void RespondWithInfo()
-        {
-            var config = Plugin.Instance.Config;
-            Respond($"Patch for railgun phasing {(config.Enabled ? "ON" : "OFF")}");
-            // TODO: Respond with your plugin settings
-            // For example:
-            //Respond($"custom_setting: {Format(config.CustomSetting)}");
+            Respond("SeMissilePatches commands:");
+            Respond("  !missilepatches help");
+            Respond("  !missilepatches info");
+            Respond("    Checks the current state of all the plugin's options");
+            Respond("  !missilepatches phasing [Boolean]");
+            Respond("    Checks or changes the state of the phasing patch");
+            Respond("  !missilepatches damage [Boolean]");
+            Respond("    Checks or changes the state of the damage patch");
+            Respond("  !missilepatches backmove [Double]");
+            Respond("    Checks or changes the collision point back-movement distance (avoids clipping)");
         }
 
 
@@ -66,33 +64,81 @@ namespace TorchPlugin
 
         // ReSharper disable once UnusedMember.Global
 
-        [Command("phasingpatch help", "Displays the commands available for SePhasingPatch")]
+        [Command("missilepatches help", "Displays the commands available for SeMissilePatches")]
         [Permission(MyPromoteLevel.None)]
         public void Help()
         {
             RespondWithHelp();
         }
-        
-        // TODO: Subcommand
-        // ReSharper disable once UnusedMember.Global
-        [Command("phasingpatch enabled", "Checks or sets the enabled state of the plugin's patch for phasing.")]
+        [Command("missilepatches info", "Checks the current state of all the plugin's options")]
+        [Permission(MyPromoteLevel.None)]
+        public void Info()
+        {
+            Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
+            Respond($"Patch for projectile damage {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
+            Respond($"Collision point back-movement set to {Plugin.Instance.Config.BackMovement} meters");
+        }
+
+        [Command("missilepatches phasing", "Checks or changes the state of the phasing patch")]
         [Permission(MyPromoteLevel.Admin)]
-        public void Enabled()
+        public void Phasing()
         {
             List<string> args = Context.Args;
             if (args.Count == 0)
             {
-                RespondWithInfo();
+                Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
             }
             else if (args.Count == 1)
             {
                 bool newValue;
                 if (TryParseBool(args[0], out newValue))
                 {
-                    Config.Enabled = newValue;
-                    RespondWithInfo();
+                    Config.Phasing = newValue;
+                    Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
                 }
                 else Respond($"ERROR: Could not parse '{args[0]}' as a Boolean.");
+            }
+            else Respond("ERROR: Invalid number of arguments.");
+        }
+        [Command("missilepatches damage", "Checks or changes the state of the damage patch")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void Damage()
+        {
+            List<string> args = Context.Args;
+            if (args.Count == 0)
+            {
+                Respond($"Patch for projectile damage {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
+            }
+            else if (args.Count == 1)
+            {
+                bool newValue;
+                if (TryParseBool(args[0], out newValue))
+                {
+                    Config.Damage = newValue;
+                    Respond($"Patch for projectile damage {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
+                }
+                else Respond($"ERROR: Could not parse '{args[0]}' as a Boolean.");
+            }
+            else Respond("ERROR: Invalid number of arguments.");
+        }
+        [Command("missilepatches backmove", "Checks or changes the state of the phasing patch")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void BackMove()
+        {
+            List<string> args = Context.Args;
+            if (args.Count == 0)
+            {
+                Respond($"Collision point back-movement set to {Plugin.Instance.Config.BackMovement} meters");
+            }
+            else if (args.Count == 1)
+            {
+                double newValue;
+                if (double.TryParse(args[0], out newValue))
+                {
+                    Config.BackMovement = newValue;
+                    Respond($"Collision point back-movement set to {Plugin.Instance.Config.BackMovement} meters");
+                }
+                else Respond($"ERROR: Could not parse '{args[0]}' as a Double.");
             }
             else Respond("ERROR: Invalid number of arguments.");
         }

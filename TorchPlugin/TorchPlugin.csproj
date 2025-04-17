@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>TorchPlugin</RootNamespace>
-    <AssemblyName>Sephasingpatch</AssemblyName>
+    <AssemblyName>SeMissilePatches</AssemblyName>
     <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <LangVersion>7.3</LangVersion>
@@ -615,6 +615,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConfigView.xaml.cs" />
+    <Compile Include="MyPatchUtilities.cs" />
     <Compile Include="PhasingGamePatches.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="PluginConfig.cs" />

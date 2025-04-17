@@ -22,7 +22,7 @@ namespace Shared.Plugin
             Config = plugin.Config;
 
             GameVersion = gameVersion;
-            DataDir = Path.Combine(storageDir, "Sephasingpatch");
+            DataDir = Path.Combine(storageDir, "SeMissilePatches");
 
             PatchHelpers.Configure();
         }

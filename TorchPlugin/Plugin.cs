@@ -24,7 +24,7 @@ namespace TorchPlugin
     // ReSharper disable once ClassNeverInstantiated.Global
     public class Plugin : TorchPluginBase, IWpfPlugin, ICommonPlugin
     {
-        public const string PluginName = "SePhasingPatch";
+        public const string PluginName = "SeMissilePatches";
         public static Plugin Instance { get; private set; }
 
         public long Tick { get; private set; }
