@@ -24,7 +24,7 @@ namespace TorchPlugin
     // ReSharper disable once ClassNeverInstantiated.Global
     public class Plugin : TorchPluginBase, IWpfPlugin, ICommonPlugin
     {
-        public const string PluginName = "PluginTemplate";
+        public const string PluginName = "SePhasingPatch";
         public static Plugin Instance { get; private set; }
 
         public long Tick { get; private set; }
@@ -52,12 +52,6 @@ namespace TorchPlugin
         public override void Init(ITorchBase torch)
         {
             base.Init(torch);
-
-#if DEBUG
-            // Allow the debugger some time to connect once the plugin assembly is loaded
-            Thread.Sleep(100);
-#endif
-
             Instance = this;
 
             Log.Info("Init");
@@ -69,13 +63,11 @@ namespace TorchPlugin
             var gameVersion = new StringBuilder(MyBuildNumbers.ConvertBuildNumberFromIntToString(gameVersionNumber)).ToString();
             Common.SetPlugin(this, gameVersion, StoragePath);
 
-#if USE_HARMONY
             if (!PatchHelpers.HarmonyPatchAll(Log, new Harmony(Name)))
             {
                 failed = true;
                 return;
             }
-#endif
 
             sessionManager = torch.Managers.GetManager<TorchSessionManager>();
             sessionManager.SessionStateChanged += SessionStateChanged;

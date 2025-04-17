@@ -1,5 +1,7 @@
 using Shared.Config;
 using Shared.Plugin;
+using System.Collections.Generic;
+using System.Windows.Documents;
 using Torch.Commands;
 using Torch.Commands.Permissions;
 using VRage.Game.ModAPI;
@@ -19,32 +21,21 @@ namespace TorchPlugin
         // TODO: Implement subcommands as needed
         private void RespondWithHelp()
         {
-            Respond("PluginTemplate commands:");
-            Respond("  !cmd help");
-            Respond("  !cmd info");
-            Respond("    Prints the current configuration settings.");
-            Respond("  !cmd enable");
-            Respond("    Enables the plugin");
-            Respond("  !cmd disable");
-            Respond("    Disables the plugin");
-            Respond("  !cmd subcmd <name> <value>");
-            Respond("    TODO Your subcommand");
+            Respond("SePhasingPatch commands:");
+            Respond("  !phasingpatch help");
+            Respond("  !phasingpatch enabled [Boolean]");
+            Respond("    Checks or changes the state of the plugin");
         }
 
         private void RespondWithInfo()
         {
             var config = Plugin.Instance.Config;
-            Respond($"{Plugin.PluginName} plugin is enabled: {Format(config.Enabled)}");
+            Respond($"Patch for railgun phasing {(config.Enabled ? "ON" : "OFF")}");
             // TODO: Respond with your plugin settings
             // For example:
             //Respond($"custom_setting: {Format(config.CustomSetting)}");
         }
 
-        // Custom formatters
-
-        private static string Format(bool value) => value ? "Yes" : "No";
-
-        // Custom parsers
 
         private static bool TryParseBool(string text, out bool result)
         {
@@ -75,48 +66,35 @@ namespace TorchPlugin
 
         // ReSharper disable once UnusedMember.Global
 
-        [Command("cmd help", "PluginTemplate: Help")]
+        [Command("phasingpatch help", "Displays the commands available for SePhasingPatch")]
         [Permission(MyPromoteLevel.None)]
         public void Help()
         {
             RespondWithHelp();
         }
-
-        // ReSharper disable once UnusedMember.Global
-        [Command("cmd info", "PluginTemplate: Prints the current settings")]
-        [Permission(MyPromoteLevel.None)]
-        public void Info()
-        {
-            RespondWithInfo();
-        }
-
-        // ReSharper disable once UnusedMember.Global
-        [Command("cmd enable", "PluginTemplate: Enables the plugin")]
-        [Permission(MyPromoteLevel.Admin)]
-        public void Enable()
-        {
-            Config.Enabled = true;
-            RespondWithInfo();
-        }
-
-        // ReSharper disable once UnusedMember.Global
-        [Command("cmd disable", "PluginTemplate: Disables the plugin")]
-        [Permission(MyPromoteLevel.Admin)]
-        public void Disable()
-        {
-            Config.Enabled = false;
-            RespondWithInfo();
-        }
-
+        
         // TODO: Subcommand
         // ReSharper disable once UnusedMember.Global
-        [Command("cmd subcmd", "PluginTemplate: TODO: Subcommand")]
+        [Command("phasingpatch enabled", "Checks or sets the enabled state of the plugin's patch for phasing.")]
         [Permission(MyPromoteLevel.Admin)]
-        public void SubCmd(string name, string value)
+        public void Enabled()
         {
-            // TODO: Process command parameters (for example name and value)
-
-            RespondWithInfo();
+            List<string> args = Context.Args;
+            if (args.Count == 0)
+            {
+                RespondWithInfo();
+            }
+            else if (args.Count == 1)
+            {
+                bool newValue;
+                if (TryParseBool(args[0], out newValue))
+                {
+                    Config.Enabled = newValue;
+                    RespondWithInfo();
+                }
+                else Respond($"ERROR: Could not parse '{args[0]}' as a Boolean.");
+            }
+            else Respond("ERROR: Invalid number of arguments.");
         }
     }
 }

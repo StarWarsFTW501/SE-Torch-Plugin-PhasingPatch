@@ -16,7 +16,7 @@ namespace TorchPlugin
         //       Once the feature is stable set the default here to true to enable for
         //       newly created Torch deployments.
 
-        [Display(Order = 1, GroupName = "General", Name = "Enable plugin", Description = "Enable the plugin")]
+        [Display(Order = 1, GroupName = "General", Name = "Enable plugin", Description = "Enable the phasing patch")]
         public bool Enabled
         {
             get => enabled;
