@@ -71,7 +71,7 @@ namespace TorchPlugin
             RespondWithHelp();
         }
         [Command("missilepatches info", "Checks the current state of all the plugin's options")]
-        [Permission(MyPromoteLevel.None)]
+        [Permission(MyPromoteLevel.Admin)]
         public void Info()
         {
             Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
