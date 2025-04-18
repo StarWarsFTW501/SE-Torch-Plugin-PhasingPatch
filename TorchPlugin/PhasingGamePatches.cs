@@ -26,7 +26,7 @@ namespace ClientPlugin
             if (Plugin.Instance.Config.Phasing)
             {
 #if DEBUG
-                Plugin.Instance.Log.Debug("OnContactStart patch triggered (prefix)");
+                Plugin.Instance.Log.Info("OnContactStart patch triggered (prefix)");
 #endif
 
                 // Start the phasing fix for this task while the main thread completes this tick and gets back to this missile next tick
@@ -40,7 +40,7 @@ namespace ClientPlugin
             if (Plugin.Instance.Config.Phasing)
             {
 #if DEBUG
-                Plugin.Instance.Log.Debug("HitEntity patch triggered (prefix)");
+                Plugin.Instance.Log.Info("HitEntity patch triggered (prefix)");
 #endif
 
                 // Main thread has reached the point where it executes this missile's hit logic. Complete the fix before continuing.
@@ -54,7 +54,7 @@ namespace ClientPlugin
             if (Plugin.Instance.Config.Phasing)
             {
 #if DEBUG
-                Plugin.Instance.Log.Debug("MarkForExplosion patch triggered (postfix)");
+                Plugin.Instance.Log.Info("MarkForExplosion patch triggered (postfix)");
 #endif
 
                 // The MarkForExplosion method has finished. Regardless of if it tried to hit an entity, clean up all references to the phasing fix.
@@ -68,7 +68,7 @@ namespace ClientPlugin
             if (Plugin.Instance.Config.Damage)
             {
 #if DEBUG
-                Plugin.Instance.Log.Debug("HitGrid patch triggered (prefix)");
+                Plugin.Instance.Log.Info("HitGrid patch triggered (prefix)");
 #endif
 
                 // Run replacement single-grid damage application
@@ -86,7 +86,7 @@ namespace ClientPlugin
             if (Plugin.Instance.Config.Damage)
             {
 #if DEBUG
-                Plugin.Instance.Log.Debug("HitMultipleGrids patch triggered (prefix)");
+                Plugin.Instance.Log.Info("HitMultipleGrids patch triggered (prefix)");
 #endif
 
                 // Run replacement multi-grid damage application

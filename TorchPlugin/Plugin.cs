@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Controls;
 using HarmonyLib;
+using NLog;
 using Sandbox.Game;
 using Shared.Config;
 using Shared.Logging;
@@ -17,6 +18,7 @@ using Torch.API.Managers;
 using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Session;
+using Torch.Utils;
 using VRage.Utils;
 
 namespace TorchPlugin
@@ -47,7 +49,7 @@ namespace TorchPlugin
         private bool failed;
 
         // ReSharper disable once UnusedMember.Local
-        private readonly Commands commands = new Commands();
+        // private readonly Commands commands = new Commands();
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         public override void Init(ITorchBase torch)

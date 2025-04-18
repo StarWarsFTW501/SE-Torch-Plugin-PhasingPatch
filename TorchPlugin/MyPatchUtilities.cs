@@ -1,17 +1,24 @@
-﻿using Sandbox.Game.Entities;
+﻿using Sandbox;
+using Sandbox.Engine.Multiplayer;
+using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
+using Sandbox.Game.Screens.Helpers;
 using Sandbox.Game.Weapons;
+using Sandbox.Game.World;
+using Sandbox.ModAPI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
+using VRage.Game.ModAPI.Ingame;
 using VRage.Game.Models;
 using VRageMath;
 
@@ -37,54 +44,144 @@ namespace TorchPlugin
 
             MyEntity collidedEntity = (MyEntity)_missileCollidedEntityInfo.GetValue(missile);
 
+            Vector3D position;
+            Vector3D? detectedCollisionPoint;
+
+            lock (missile)
+            {
+                // Obtain previous missile position and the collision point subject to correction
+                position = missile.PositionComp.GetPosition();
+                detectedCollisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
+            }
+
             if (collidedEntity != null
+                && detectedCollisionPoint.HasValue
                 && collidedEntity is MyCubeGrid grid
                 && !_collisionCorrectionTasks.ContainsKey(missile) // No task is already running for this missile
                 && !grid.IsPreview
                 && grid.Projector == null)
             {
-                // Obtain previous missile position and the collision point subject to correction
-                Vector3D position = missile.PositionComp.GetPosition();
-                Vector3D detectedCollisionPoint = (Vector3D)_missileCollisionPointInfo.GetValue(missile);
+                Vector3D globalSpaceDirection = position - detectedCollisionPoint.Value;
 
-                // Construct ray along which we want the corrected point found
-                LineD ray = new LineD(position, detectedCollisionPoint);
 
-                // Start task calculating the corrected point and normal
-                var task = Task.Run(() =>
+                // For whatever reason, phasing can happen in the opposite direction as well
+                // -> invert the phase check not to pull the collision out of the grid but rather to push it into it
+                bool invertPhaseCheck = globalSpaceDirection.Dot(missile.LinearVelocity) > 0;
+
+                if (invertPhaseCheck)
+                    globalSpaceDirection *= -1;
+
+                // Correct position to furthest extents of the grid
+                globalSpaceDirection = globalSpaceDirection.Normalized();
+
+                MatrixD gridMatrix = grid.WorldMatrix;
+                MatrixD gridMatrixTransposed = MatrixD.Transpose(gridMatrix);
+
+                Vector3D gridSpaceDirection = Vector3D.TransformNormal(globalSpaceDirection, gridMatrixTransposed);
+
+                Vector3I gridMin = grid.Min, gridMax = grid.Max;
+                
+
+                // Take the corner which the direction points closest to, and make a relative vector from detected collision to the corner
+                // (buffered by .3 blocks)
+                var gridSpaceRelativeRelevantCorner = new Vector3D(
+                    gridSpaceDirection.X < 0 ? gridMin.X - .8 : gridMax.X + .8,
+                    gridSpaceDirection.Y < 0 ? gridMin.Y - .8 : gridMax.Y + .8,
+                    gridSpaceDirection.Z < 0 ? gridMin.Z - .8 : gridMax.Z + .8
+                    ) * grid.GridSize - Vector3D.TransformNormal(detectedCollisionPoint.Value - gridMatrix.Translation, gridMatrixTransposed); ;
+
+                // Take the multiplier that gets our vector to the grid extents, capped to 250 meters
+                double vectorMultiplier = MathHelper.Min((gridSpaceRelativeRelevantCorner / gridSpaceDirection).Min(), 250);
+
+#if DEBUG
+                lock (Plugin.Instance.Log)
                 {
-                    // Obtain cells along correction ray
-                    List<Vector3I> collidedGridCells = new List<Vector3I>();
-                    grid.RayCastCells(position, detectedCollisionPoint, collidedGridCells, null, false, false);
-
-
-                    (Vector3D, Vector3)? correctedCollisionData = null;
-
-                    // Iterate over intersected cells - get first one hit
-                    foreach (var gridCell in collidedGridCells)
+                    Plugin.Instance.Log.Info($"Raycast distance set to {vectorMultiplier:0.000} m");
+                }
+                if ((bool)typeof(Commands).GetField("GPSSpam", BindingFlags.Static | BindingFlags.Public).GetValue(null))
+                {
+                    MyGpsCollection gpsCollection = (MyGpsCollection)MyAPIGateway.Session?.GPS;
+                    lock (gpsCollection)
                     {
-                        // If we both found a cube in a grid cell and got a hit on it with the raycast, we have acquired a better collision point
-                        if (grid.TryGetCube(gridCell, out MyCube cube)
-                            && TryRayCastCube(cube, grid, ref ray, out correctedCollisionData))
+                        MyGps gpsCollision = new MyGps
                         {
-                            break;
+                            Coords = detectedCollisionPoint.Value,
+                            Name = "m_collisionPoint",
+                            DisplayName = "m_collisionPoint",
+                            GPSColor = Color.DarkRed,
+                            ShowOnHud = true
+                        };
+                        MyGps gpsPrevTick = new MyGps
+                        {
+                            Coords = position,
+                            Name = "lastTick",
+                            DisplayName = "lastTick",
+                            GPSColor = Color.Cyan,
+                            ShowOnHud = true
+                        };
+                        MyGps gpsCastFrom = new MyGps
+                        {
+                            Coords = detectedCollisionPoint.Value + globalSpaceDirection * vectorMultiplier,
+                            Name = "castFrom",
+                            DisplayName = "castFrom",
+                            GPSColor = Color.Gold,
+                            ShowOnHud = true
+                        };
+                        if (gpsCollection != null)
+                        {
+                            foreach (var player in MySession.Static.Players.GetOnlinePlayers())
+                            {
+                                gpsCollection.SendAddGpsRequest(player.Identity.IdentityId, ref gpsCollision);
+                                gpsCollection.SendAddGpsRequest(player.Identity.IdentityId, ref gpsPrevTick);
+                                gpsCollection.SendAddGpsRequest(player.Identity.IdentityId, ref gpsCastFrom);
+                            }
                         }
                     }
+                }
+#endif
 
-                    if (correctedCollisionData.HasValue)
+                position = detectedCollisionPoint.Value + globalSpaceDirection * vectorMultiplier;
+                if (!globalSpaceDirection.IsZero())
+                {
+                    // Start task calculating the corrected point and normal
+                    var task = Task.Run(() =>
                     {
-                        // Finish the task with the newly created collision point and normal
-                        // The collision point gets moved back along the damage ray by the configured amount to avoid clipping through the surface, especially with the damage fix enabled
-                        return (correctedCollisionData.Value.Item1 - ray.Direction * Plugin.Instance.Config.BackMovement,
-                            correctedCollisionData.Value.Item2);
-                    }
+                        
 
-                    // No better collision point was found - returning no data
-                    return ((Vector3D, Vector3)?)null;
-                });
+                        // Construct ray along which we want the corrected point found
+                        LineD ray = new LineD(position, detectedCollisionPoint.Value);
 
-                // Stores the task reference for this missile
-                _collisionCorrectionTasks[missile] = task;
+                        // Obtain cells along correction ray
+                        List<Vector3I> collidedGridCells = new List<Vector3I>();
+                        grid.RayCastCells(position, detectedCollisionPoint.Value, collidedGridCells, null, false, false);
+                        (Vector3D, Vector3)? correctedCollisionData = null;
+
+                        // Iterate over intersected cells - get first one hit
+                        foreach (var gridCell in collidedGridCells)
+                        {
+                            // If we both found a cube in a grid cell and got a hit on it with the raycast, we have acquired a better collision point
+                            if (grid.TryGetCube(gridCell, out MyCube cube)
+                                && TryRayCastCube(cube, grid, ref ray, out correctedCollisionData))
+                            {
+                                break;
+                            }
+                        }
+
+                        if (correctedCollisionData.HasValue)
+                        {
+                            // Finish the task with the newly created collision point and normal
+                            // The collision point gets moved back along the damage ray by the configured amount to avoid clipping through the surface, especially with the damage fix enabled
+                            return (correctedCollisionData.Value.Item1 - ray.Direction * Plugin.Instance.Config.BackMovement,
+                                correctedCollisionData.Value.Item2);
+                        }
+
+                        // No better collision point was found - returning no data
+                        return ((Vector3D, Vector3)?)null;
+                    });
+
+                    // Stores the task reference for this missile
+                    _collisionCorrectionTasks[missile] = task;
+                }
             }
         }
         // If any phasing fix was started for the given missile, synchronnously awaits its completion and applies the changes
@@ -191,7 +288,7 @@ namespace TorchPlugin
                 }
 
 #if DEBUG
-                Plugin.Instance.Log.Debug($"Single-grid hit complete. Cells: {_missileDamageGridCells} <> Raycasts: {raycasts} <> Blocks: {hitBlocks} <> Remaining health: {missile.HealthPool}");
+                Plugin.Instance.Log.Info($"Single-grid hit complete. Cells: {_missileDamageGridCells} <> Raycasts: {raycasts} <> Blocks: {hitBlocks} <> Remaining health: {missile.HealthPool}");
 #endif
                 _missileDamageGridCells.Clear();
             }
@@ -301,7 +398,7 @@ namespace TorchPlugin
                     }
                 }
 #if DEBUG
-                Plugin.Instance.Log.Debug($"Multi-grid hit complete. Cells: {hitCells} <> Raycasts: {raycasts} <> Blocks: {hitBlocks} <> Remaining health: {missile.HealthPool}");
+                Plugin.Instance.Log.Info($"Multi-grid hit complete. Cells: {hitCells} <> Raycasts: {raycasts} <> Blocks: {hitBlocks} <> Remaining health: {missile.HealthPool}");
 #endif
             }
 

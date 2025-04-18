@@ -32,6 +32,8 @@ namespace TorchPlugin
             Respond("    Checks or changes the state of the damage patch");
             Respond("  !missilepatches backmove [Double]");
             Respond("    Checks or changes the collision point back-movement distance (avoids clipping)");
+            Respond("  !missilepatches gpsspam [Boolean]");
+            Respond("    Checks or changes if GPS coords should be created for all players when a projectile lands");
         }
 
 
@@ -77,6 +79,9 @@ namespace TorchPlugin
             Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
             Respond($"Patch for projectile damage {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
             Respond($"Collision point back-movement set to {Plugin.Instance.Config.BackMovement} meters");
+#if DEBUG
+            Respond($"GPS creation {(GPSSpam ? "ON" : "OFF")}. This setting is not persistent!");
+#endif
         }
 
         [Command("missilepatches phasing", "Checks or changes the state of the phasing patch")]
@@ -142,5 +147,29 @@ namespace TorchPlugin
             }
             else Respond("ERROR: Invalid number of arguments.");
         }
+#if DEBUG
+        public static bool GPSSpam = false;
+        [Command("missilepatches gpsspam", "Checks or changes if GPS coords should be created for all players when a projectile lands")]
+        [Permission(MyPromoteLevel.Admin)]
+        public void GPSTime()
+        {
+            List<string> args = Context.Args;
+            if (args.Count == 0)
+            {
+                Respond($"GPS creation {(GPSSpam ? "ON" : "OFF")}. This setting is not persistent!");
+            }
+            else if (args.Count == 1)
+            {
+                bool newValue;
+                if (bool.TryParse(args[0], out newValue))
+                {
+                    GPSSpam = newValue;
+                    Respond($"GPS creation {(GPSSpam ? "ON" : "OFF")}. This setting is not persistent!");
+                }
+                else Respond($"ERROR: Could not parse '{args[0]}' as a Boolean.");
+            }
+            else Respond("ERROR: Invalid number of arguments.");
+        }
+#endif
     }
 }
