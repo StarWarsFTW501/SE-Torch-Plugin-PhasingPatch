@@ -133,6 +133,11 @@ namespace TorchPlugin
                 // Maintaining a list of already considered block IDs to not needlessly visit the same block twice, firing more raycasts
                 HashSet<int> alreadyHitBlocks = new HashSet<int>();
 
+#if DEBUG
+                int hitBlocks = 0;
+                int raycasts = 0;
+#endif
+
                 foreach (var gridCell in _missileDamageGridCells)
                 {
                     // Attempt a cube raycast
@@ -142,7 +147,12 @@ namespace TorchPlugin
                         MySlimBlock slimBlock = cube.CubeBlock;
                         if (alreadyHitBlocks.Add(slimBlock.UniqueId) && (grid.BlocksDestructionEnabled || slimBlock.ForceBlockDestructible))
                         {
-                            if (TryRayCastCube(cube, grid, ref damageRay, out _, false, IntersectionFlags.ALL_TRIANGLES))
+#if DEBUG
+                            raycasts++;
+#endif
+                            // Attempt a cube raycast
+                            // The triangle is not transformed in this call to save the tiny bit of performance it costs
+                            if (TryRayCastCube(cube, grid, ref damageRay, out _, false))
                             {
                                 float startingMissileHealth = missile.HealthPool;
 
@@ -157,6 +167,10 @@ namespace TorchPlugin
                                 // Damage code pretty much copied from keen implementation, just extracted a bit to avoid forcing calls to inaccessible methods through reflection
                                 float damageToApply = Math.Min(slimBlock.GetRemainingDamage(), missile.HealthPool);
                                 slimBlock.DoDamage(damageToApply, MyDamageType.Bullet, true, hitInfo, missile.LauncherId);
+
+#if DEBUG
+                                hitBlocks++;
+#endif
 
                                 // I'm pretty sure the positive infinity thing won't ever trigger but whatever
                                 if (float.IsPositiveInfinity(damageToApply))
@@ -175,12 +189,22 @@ namespace TorchPlugin
                         }
                     }
                 }
+
+#if DEBUG
+                Plugin.Instance.Log.Debug($"Single-grid hit complete. Cells: {_missileDamageGridCells} <> Raycasts: {raycasts} <> Blocks: {hitBlocks} <> Remaining health: {missile.HealthPool}");
+#endif
                 _missileDamageGridCells.Clear();
             }
         }
         internal static void HitMultipleGridsWithMissile(MyMissile missile, List<MyLineSegmentOverlapResult<MyEntity>> hits, Vector3D nextPosition)
         {
             Vector3D? collisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
+
+#if DEBUG
+            int hitCells = 0;
+            int hitBlocks = 0;
+            int raycasts = 0;
+#endif
 
             // No application if we don't have a collision point or there are no hits given... shouldn't be called then, but you never know
             if (collisionPoint.HasValue
@@ -209,6 +233,9 @@ namespace TorchPlugin
                             }
                         }
                         // Keen code would now sort the list in place - we don't have to as we maintained order
+#if DEBUG
+                        hitCells += _missileDamageGridCells.Count;
+#endif
                         _missileDamageGridCells.Clear();
                     }
                 }
@@ -232,6 +259,9 @@ namespace TorchPlugin
 
                     if (alreadyHitBlocks.Add(slimBlock.UniqueId) && (grid.BlocksDestructionEnabled || slimBlock.ForceBlockDestructible))
                     {
+#if DEBUG
+                        raycasts++;
+#endif
                         // Attempt a cube raycast
                         // The triangle is not transformed in this call to save the tiny bit of performance it costs
                         if (TryRayCastCube(cube, grid, ref damageRay, out _, false))
@@ -250,6 +280,10 @@ namespace TorchPlugin
                             float damageToApply = Math.Min(slimBlock.GetRemainingDamage(), missile.HealthPool);
                             slimBlock.DoDamage(damageToApply, MyDamageType.Bullet, true, hitInfo, missile.LauncherId);
 
+#if DEBUG
+                            hitBlocks++;
+#endif
+
                             // I'm pretty sure the positive infinity thing won't ever trigger but whatever
                             if (float.IsPositiveInfinity(damageToApply))
                                 missile.HealthPool = 0;
@@ -266,6 +300,9 @@ namespace TorchPlugin
                         }
                     }
                 }
+#if DEBUG
+                Plugin.Instance.Log.Debug($"Multi-grid hit complete. Cells: {hitCells} <> Raycasts: {raycasts} <> Blocks: {hitBlocks} <> Remaining health: {missile.HealthPool}");
+#endif
             }
 
         }

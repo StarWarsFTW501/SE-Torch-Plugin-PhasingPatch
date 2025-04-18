@@ -42,6 +42,7 @@ namespace TorchPlugin
 
         private TorchSessionManager sessionManager;
 
+
         private bool initialized;
         private bool failed;
 

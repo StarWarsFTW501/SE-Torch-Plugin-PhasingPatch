@@ -25,6 +25,10 @@ namespace ClientPlugin
         {
             if (Plugin.Instance.Config.Phasing)
             {
+#if DEBUG
+                Plugin.Instance.Log.Debug("OnContactStart patch triggered (prefix)");
+#endif
+
                 // Start the phasing fix for this task while the main thread completes this tick and gets back to this missile next tick
                 MyPatchUtilities.InitiatePhasingFix(__instance);
             }
@@ -35,6 +39,10 @@ namespace ClientPlugin
         {
             if (Plugin.Instance.Config.Phasing)
             {
+#if DEBUG
+                Plugin.Instance.Log.Debug("HitEntity patch triggered (prefix)");
+#endif
+
                 // Main thread has reached the point where it executes this missile's hit logic. Complete the fix before continuing.
                 MyPatchUtilities.CompletePhasingFix(__instance);
             }
@@ -45,6 +53,10 @@ namespace ClientPlugin
         {
             if (Plugin.Instance.Config.Phasing)
             {
+#if DEBUG
+                Plugin.Instance.Log.Debug("MarkForExplosion patch triggered (postfix)");
+#endif
+
                 // The MarkForExplosion method has finished. Regardless of if it tried to hit an entity, clean up all references to the phasing fix.
                 MyPatchUtilities.ClearPhasingFix(__instance);
             }
@@ -55,6 +67,10 @@ namespace ClientPlugin
         {
             if (Plugin.Instance.Config.Damage)
             {
+#if DEBUG
+                Plugin.Instance.Log.Debug("HitGrid patch triggered (prefix)");
+#endif
+
                 // Run replacement single-grid damage application
                 MyPatchUtilities.HitSingleGridWithMissile(__instance, grid, nextPosition);
 
@@ -69,6 +85,10 @@ namespace ClientPlugin
         {
             if (Plugin.Instance.Config.Damage)
             {
+#if DEBUG
+                Plugin.Instance.Log.Debug("HitMultipleGrids patch triggered (prefix)");
+#endif
+
                 // Run replacement multi-grid damage application
                 MyPatchUtilities.HitMultipleGridsWithMissile(__instance, hits, nextPosition);
 
