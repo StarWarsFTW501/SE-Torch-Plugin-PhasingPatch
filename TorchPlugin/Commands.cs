@@ -121,7 +121,7 @@ namespace TorchPlugin
             }
             else Respond("ERROR: Invalid number of arguments.");
         }
-        [Command("missilepatches backmove", "Checks or changes the state of the phasing patch")]
+        [Command("missilepatches backmove", "Checks or changes the collision point back movement distance")]
         [Permission(MyPromoteLevel.Admin)]
         public void BackMove()
         {
