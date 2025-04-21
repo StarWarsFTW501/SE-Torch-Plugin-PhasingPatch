@@ -45,23 +45,31 @@ namespace TorchPlugin
             MyEntity collidedEntity = (MyEntity)_missileCollidedEntityInfo.GetValue(missile);
 
             Vector3D position;
-            Vector3D? detectedCollisionPoint;
+            Vector3 normal;
+            Vector3D? pulledCollisionPoint;
 
-            lock (missile)
-            {
-                // Obtain previous missile position and the collision point subject to correction
-                position = missile.PositionComp.GetPosition();
-                detectedCollisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
-            }
+            // Obtain previous missile position and the collision point subject to correction
+            position = missile.PositionComp.GetPosition();
+            normal = (Vector3)_missileCollisionNormalInfo.GetValue(missile);
+            pulledCollisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
 
             if (collidedEntity != null
-                && detectedCollisionPoint.HasValue
+                && pulledCollisionPoint.HasValue
                 && collidedEntity is MyCubeGrid grid
                 && !_collisionCorrectionTasks.ContainsKey(missile) // No task is already running for this missile
                 && !grid.IsPreview
                 && grid.Projector == null)
             {
-                Vector3D globalSpaceDirection = position - detectedCollisionPoint.Value;
+                // All this stuff needs to be put into the Task but I can't be bothered with thread safety for things that won't be in the final build anyway
+
+                // Correct the collision point to lay on the missile's trajectory
+                Vector3D velocityNorm = missile.LinearVelocity.Normalized();
+                Vector3D globalSpaceDirection = velocityNorm.Dot(position - pulledCollisionPoint.Value) * velocityNorm;
+
+                // globalSpaceDirection is from the collision to last tick pos, = we need to subtract it from last tick pos to get the global collision point
+                Vector3D orthCollisionPoint = position - globalSpaceDirection;
+
+
 
 
                 // For whatever reason, phasing can happen in the opposite direction as well
@@ -88,7 +96,7 @@ namespace TorchPlugin
                     gridSpaceDirection.X < 0 ? gridMin.X - .8 : gridMax.X + .8,
                     gridSpaceDirection.Y < 0 ? gridMin.Y - .8 : gridMax.Y + .8,
                     gridSpaceDirection.Z < 0 ? gridMin.Z - .8 : gridMax.Z + .8
-                    ) * grid.GridSize - Vector3D.TransformNormal(detectedCollisionPoint.Value - gridMatrix.Translation, gridMatrixTransposed); ;
+                    ) * grid.GridSize - Vector3D.TransformNormal(orthCollisionPoint - gridMatrix.Translation, gridMatrixTransposed); ;
 
                 // Take the multiplier that gets our vector to the grid extents, capped to 250 meters
                 double vectorMultiplier = MathHelper.Min((gridSpaceRelativeRelevantCorner / gridSpaceDirection).Min(), 250);
@@ -105,7 +113,7 @@ namespace TorchPlugin
                     {
                         MyGps gpsCollision = new MyGps
                         {
-                            Coords = detectedCollisionPoint.Value,
+                            Coords = orthCollisionPoint,
                             Name = "m_collisionPoint",
                             DisplayName = "m_collisionPoint",
                             GPSColor = Color.DarkRed,
@@ -121,7 +129,7 @@ namespace TorchPlugin
                         };
                         MyGps gpsCastFrom = new MyGps
                         {
-                            Coords = detectedCollisionPoint.Value + globalSpaceDirection * vectorMultiplier,
+                            Coords = orthCollisionPoint + globalSpaceDirection * vectorMultiplier,
                             Name = "castFrom",
                             DisplayName = "castFrom",
                             GPSColor = Color.Gold,
@@ -140,7 +148,7 @@ namespace TorchPlugin
                 }
 #endif
 
-                position = detectedCollisionPoint.Value + globalSpaceDirection * vectorMultiplier;
+                position = orthCollisionPoint + globalSpaceDirection * vectorMultiplier;
                 if (!globalSpaceDirection.IsZero())
                 {
                     // Start task calculating the corrected point and normal
@@ -149,22 +157,20 @@ namespace TorchPlugin
                         
 
                         // Construct ray along which we want the corrected point found
-                        LineD ray = new LineD(position, detectedCollisionPoint.Value);
+                        LineD ray = new LineD(position, orthCollisionPoint);
 
                         // Obtain cells along correction ray
                         List<Vector3I> collidedGridCells = new List<Vector3I>();
-                        grid.RayCastCells(position, detectedCollisionPoint.Value, collidedGridCells, null, false, false);
+                        grid.RayCastCells(position, orthCollisionPoint, collidedGridCells, null, false, false);
                         (Vector3D, Vector3)? correctedCollisionData = null;
 
                         // Iterate over intersected cells - get first one hit
                         foreach (var gridCell in collidedGridCells)
                         {
                             // If we both found a cube in a grid cell and got a hit on it with the raycast, we have acquired a better collision point
-                            if (grid.TryGetCube(gridCell, out MyCube cube)
-                                && TryRayCastCube(cube, grid, ref ray, out correctedCollisionData))
-                            {
-                                break;
-                            }
+                            if (grid.TryGetCube(gridCell, out MyCube cube) && 
+                                TryRayCastCube(cube, grid, ref ray, out correctedCollisionData))
+                                    break;
                         }
 
                         if (correctedCollisionData.HasValue)
@@ -175,8 +181,8 @@ namespace TorchPlugin
                                 correctedCollisionData.Value.Item2);
                         }
 
-                        // No better collision point was found - returning no data
-                        return ((Vector3D, Vector3)?)null;
+                        // No better collision point was found - returning collision point forced onto trajectory
+                        return ((Vector3D, Vector3)?)(orthCollisionPoint, normal);
                     });
 
                     // Stores the task reference for this missile
@@ -416,33 +422,36 @@ namespace TorchPlugin
 
             if (slimBlock.FatBlock != null)
             {
-                // Tries to directly raycast a fat block
-                MatrixD invertedMatrix = MatrixD.Invert(slimBlock.FatBlock.WorldMatrix);
-                MyIntersectionResultLineTriangleEx? detectedTriangle = slimBlock.FatBlock.ModelCollision.GetTrianglePruningStructure().GetIntersectionWithLine(grid, ref ray, ref invertedMatrix, flags);
-
-                // If it did not get a result, tries to raycast the fat block's subparts
-                if (!detectedTriangle.HasValue && slimBlock.FatBlock.Subparts != null)
+                lock (slimBlock.FatBlock)
                 {
-                    foreach (MyEntitySubpart subpart in slimBlock.FatBlock.Subparts.Values)
-                    {
-                        invertedMatrix = MatrixD.Invert(subpart.WorldMatrix);
-                        detectedTriangle = subpart.ModelCollision.GetTrianglePruningStructure().GetIntersectionWithLine(grid, ref ray, ref invertedMatrix, flags);
-                        if (detectedTriangle.HasValue)
-                            break;
-                    }
-                }
+                    // Tries to directly raycast a fat block
+                    MatrixD invertedMatrix = MatrixD.Invert(slimBlock.FatBlock.WorldMatrix);
+                    MyIntersectionResultLineTriangleEx? detectedTriangle = slimBlock.FatBlock.ModelCollision.GetTrianglePruningStructure().GetIntersectionWithLine(grid, ref ray, ref invertedMatrix, flags);
 
-                // If enabled, transforms the extracted triangle data to get results for the phasing fix
-                if (detectedTriangle.HasValue)
-                {
-                    if (generateIntersectionData)
+                    // If it did not get a result, tries to raycast the fat block's subparts
+                    if (!detectedTriangle.HasValue && slimBlock.FatBlock.Subparts != null)
                     {
-                        result = (Vector3D.Transform(detectedTriangle.Value.IntersectionPointInObjectSpace, slimBlock.FatBlock.WorldMatrix),
-                            Vector3.TransformNormal(detectedTriangle.Value.NormalInObjectSpace, slimBlock.FatBlock.WorldMatrix));
+                        foreach (MyEntitySubpart subpart in slimBlock.FatBlock.Subparts.Values)
+                        {
+                            invertedMatrix = MatrixD.Invert(subpart.WorldMatrix);
+                            detectedTriangle = subpart.ModelCollision.GetTrianglePruningStructure().GetIntersectionWithLine(grid, ref ray, ref invertedMatrix, flags);
+                            if (detectedTriangle.HasValue)
+                                break;
+                        }
                     }
-                    return true;
+
+                    // If enabled, transforms the extracted triangle data to get results for the phasing fix
+                    if (detectedTriangle.HasValue)
+                    {
+                        if (generateIntersectionData)
+                        {
+                            result = (Vector3D.Transform(detectedTriangle.Value.IntersectionPointInObjectSpace, slimBlock.FatBlock.WorldMatrix),
+                                Vector3.TransformNormal(detectedTriangle.Value.NormalInObjectSpace, slimBlock.FatBlock.WorldMatrix));
+                        }
+                        return true;
+                    }
+                    return false;
                 }
-                return false;
             }
             else
             {
@@ -452,27 +461,30 @@ namespace TorchPlugin
                 // Tries to raycast a slim block's cube parts
                 foreach (MyCubePart part in cube.Parts)
                 {
-                    MatrixD matrix = part.InstanceData.LocalMatrix * grid.WorldMatrix;
-                    MatrixD invertedMatrix = MatrixD.Invert(matrix);
-
-                    MyIntersectionResultLineTriangleEx? candidateTriangle = part.Model.GetTrianglePruningStructure().GetIntersectionWithLine(grid, ref ray, ref invertedMatrix, flags);
-
-                    if (candidateTriangle.HasValue)
+                    lock (part)
                     {
-                        Vector3D intersectionWorld = Vector3D.Transform(candidateTriangle.Value.IntersectionPointInObjectSpace, matrix);
+                        MatrixD matrix = part.InstanceData.LocalMatrix * grid.WorldMatrix;
+                        MatrixD invertedMatrix = MatrixD.Invert(matrix);
 
-                        double distanceSquared = Vector3D.DistanceSquared(intersectionWorld, ray.From);
+                        MyIntersectionResultLineTriangleEx? candidateTriangle = part.Model.GetTrianglePruningStructure().GetIntersectionWithLine(grid, ref ray, ref invertedMatrix, flags);
 
-                        // Gets the intersection nearest to the raycast origin
-                        if (distanceSquared < previousTriangleDistanceSquared)
+                        if (candidateTriangle.HasValue)
                         {
-                            previousTriangleDistanceSquared = distanceSquared;
-                            intersectedCube = true;
-                            if (generateIntersectionData)
+                            Vector3D intersectionWorld = Vector3D.Transform(candidateTriangle.Value.IntersectionPointInObjectSpace, matrix);
+
+                            double distanceSquared = Vector3D.DistanceSquared(intersectionWorld, ray.From);
+
+                            // Gets the intersection nearest to the raycast origin
+                            if (distanceSquared < previousTriangleDistanceSquared)
                             {
-                                // The result needs to be transformed here because each cube part has a different matrix
-                                result = (Vector3D.Transform(candidateTriangle.Value.IntersectionPointInObjectSpace, matrix),
-                                    Vector3.TransformNormal(candidateTriangle.Value.NormalInObjectSpace, matrix));
+                                previousTriangleDistanceSquared = distanceSquared;
+                                intersectedCube = true;
+                                if (generateIntersectionData)
+                                {
+                                    // The result needs to be transformed here because each cube part has a different matrix
+                                    result = (Vector3D.Transform(candidateTriangle.Value.IntersectionPointInObjectSpace, matrix),
+                                        Vector3.TransformNormal(candidateTriangle.Value.NormalInObjectSpace, matrix));
+                                }
                             }
                         }
                     }
