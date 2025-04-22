@@ -147,6 +147,7 @@ namespace TorchPlugin
             }
             else Respond("ERROR: Invalid number of arguments.");
         }
+        /*
 #if DEBUG
         public static bool GPSSpam = false;
         [Command("missilepatches gpsspam", "Checks or changes if GPS coords should be created for all players when a projectile lands")]
@@ -171,5 +172,6 @@ namespace TorchPlugin
             else Respond("ERROR: Invalid number of arguments.");
         }
 #endif
+        */
     }
 }
