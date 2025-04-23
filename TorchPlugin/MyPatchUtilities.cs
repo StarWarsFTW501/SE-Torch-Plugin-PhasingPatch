@@ -149,7 +149,7 @@ namespace TorchPlugin
                         gridSpaceDirection.X < 0 ? gridMin.X - .8 : gridMax.X + .8,
                         gridSpaceDirection.Y < 0 ? gridMin.Y - .8 : gridMax.Y + .8,
                         gridSpaceDirection.Z < 0 ? gridMin.Z - .8 : gridMax.Z + .8
-                        ) * grid.GridSize - Vector3D.TransformNormal(orthCollisionPoint - gridMatrix.Translation, gridMatrixTransposed); ;
+                        ) * grid.GridSize - Vector3D.TransformNormal(orthCollisionPoint - gridMatrix.Translation, gridMatrixTransposed);
 
                     // Take the multiplier that gets our vector to the grid extents, capped to 250 meters
                     double vectorMultiplier = MathHelper.Min((gridSpaceRelativeRelevantCorner / gridSpaceDirection).Min(), 250);
