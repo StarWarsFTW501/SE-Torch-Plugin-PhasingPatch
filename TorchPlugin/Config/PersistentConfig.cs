@@ -3,13 +3,12 @@ using System.ComponentModel;
 using System.Xml.Serialization;
 using System.IO;
 using System.Threading;
-using Shared.Logging;
+using TorchPlugin.Logging;
 
-namespace Shared.Config
+namespace TorchPlugin.Config
 {
-    // Ported from Torch's Persistent<T> class for compatibility of configuration files between targets and to work with IPluginLogger.
-    // Simple class that manages saving <see cref="P:Torch.Persistent`1.Data" /> to disk using XML serialization.
-    // Can automatically save on changes by implementing <see cref="T:System.ComponentModel.INotifyPropertyChanged" /> in the data class.
+    /// <summary>Simple class that manages saving <see cref="PersistentConfig{T}.Data" /> to disk using XML serialization.
+    /// Can automatically save on changes by implementing <see cref="T:System.ComponentModel.INotifyPropertyChanged" /> in the data class.</summary>
     /// <typeparam name="T">Data class type</typeparam>
     public class PersistentConfig<T> : IDisposable where T : class, INotifyPropertyChanged, new()
     {

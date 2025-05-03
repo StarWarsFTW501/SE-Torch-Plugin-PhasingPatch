@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 
-namespace Shared.Tools
+namespace TorchPlugin.Tools
 {
     public static class Hashing
     {

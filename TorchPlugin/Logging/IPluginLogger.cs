@@ -1,6 +1,6 @@
 using System;
 
-namespace Shared.Logging
+namespace TorchPlugin.Logging
 {
     public interface IPluginLogger
     {

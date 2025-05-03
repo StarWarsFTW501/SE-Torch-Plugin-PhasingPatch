@@ -1,7 +1,7 @@
 using System.Reflection;
 using HarmonyLib;
 
-namespace Shared.Tools
+namespace TorchPlugin.Tools
 {
     public class CodeChange
     {

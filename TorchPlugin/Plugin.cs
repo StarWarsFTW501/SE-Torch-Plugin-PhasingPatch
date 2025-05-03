@@ -2,29 +2,25 @@
 
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading;
 using System.Windows.Controls;
 using HarmonyLib;
-using NLog;
 using Sandbox.Game;
-using Shared.Config;
-using Shared.Logging;
-using Shared.Patches;
-using Shared.Plugin;
+using TorchPlugin.Config;
+using TorchPlugin.Logging;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
 using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Session;
-using Torch.Utils;
 using VRage.Utils;
 
 namespace TorchPlugin
 {
     // ReSharper disable once ClassNeverInstantiated.Global
-    public class Plugin : TorchPluginBase, IWpfPlugin, ICommonPlugin
+    public class Plugin : TorchPluginBase, IWpfPlugin
     {
         public const string PluginName = "SeMissilePatches";
         public static Plugin Instance { get; private set; }
@@ -34,48 +30,50 @@ namespace TorchPlugin
         public IPluginLogger Log => Logger;
         private static readonly IPluginLogger Logger = new PluginLogger(PluginName);
 
-        public IPluginConfig Config => config?.Data;
-        private PersistentConfig<PluginConfig> config;
+        public IPluginConfig Config => _config?.Data;
+        private PersistentConfig<PluginConfig> _config;
         private static readonly string ConfigFileName = $"{PluginName}.cfg";
 
         // ReSharper disable once UnusedMember.Global
-        public UserControl GetControl() => control ?? (control = new ConfigView());
-        private ConfigView control;
+        public UserControl GetControl() => _control ?? (_control = new ConfigView());
+        private ConfigView _control;
 
-        private TorchSessionManager sessionManager;
+        private TorchSessionManager _sessionManager;
 
 
-        private bool initialized;
-        private bool failed;
+        private bool _initialized;
+        private bool _failed;
 
         // ReSharper disable once UnusedMember.Local
         // private readonly Commands commands = new Commands();
 
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public override void Init(ITorchBase torch)
         {
             base.Init(torch);
             Instance = this;
 
-            Log.Info("Init");
+            Log.Info("Initializing plugin...");
 
             var configPath = Path.Combine(StoragePath, ConfigFileName);
-            config = PersistentConfig<PluginConfig>.Load(Log, configPath);
+            _config = PersistentConfig<PluginConfig>.Load(Log, configPath);
 
             var gameVersionNumber = MyPerGameSettings.BasicGameInfo.GameVersion ?? 0;
             var gameVersion = new StringBuilder(MyBuildNumbers.ConvertBuildNumberFromIntToString(gameVersionNumber)).ToString();
-            Common.SetPlugin(this, gameVersion, StoragePath);
+
+            RuntimeHelpers.RunClassConstructor(typeof(MyPatchUtilities).TypeHandle);
 
             if (!PatchHelpers.HarmonyPatchAll(Log, new Harmony(Name)))
             {
-                failed = true;
+                _failed = true;
                 return;
             }
 
-            sessionManager = torch.Managers.GetManager<TorchSessionManager>();
-            sessionManager.SessionStateChanged += SessionStateChanged;
+            _sessionManager = torch.Managers.GetManager<TorchSessionManager>();
+            _sessionManager.SessionStateChanged += SessionStateChanged;
 
-            initialized = true;
+            Log.Info("Initialized.");
+            _initialized = true;
         }
 
         private void SessionStateChanged(ITorchSession session, TorchSessionState newstate)
@@ -102,12 +100,12 @@ namespace TorchPlugin
 
         public override void Dispose()
         {
-            if (initialized)
+            if (_initialized)
             {
                 Log.Debug("Disposing");
 
-                sessionManager.SessionStateChanged -= SessionStateChanged;
-                sessionManager = null;
+                _sessionManager.SessionStateChanged -= SessionStateChanged;
+                _sessionManager = null;
 
                 Log.Debug("Disposed");
             }
@@ -119,7 +117,7 @@ namespace TorchPlugin
 
         public override void Update()
         {
-            if (failed)
+            if (_failed)
                 return;
 
             try
@@ -130,14 +128,13 @@ namespace TorchPlugin
             catch (Exception e)
             {
                 Log.Critical(e, "Update failed");
-                failed = true;
+                _failed = true;
             }
         }
 
         private void CustomUpdate()
         {
             // TODO: Put your update processing here. It is called on every simulation frame!
-            PatchHelpers.PatchUpdates();
         }
     }
 }

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 
-namespace Shared.Tools
+namespace TorchPlugin.Tools
 {
     // Attribute to mark prefix and suffix patch methods
     // For usage examples please search this repo:
@@ -56,7 +56,7 @@ namespace Shared.Tools
 
         private IEnumerable<CodeChange> VerifyMethod(MethodInfo patchMethod)
         {
-            Plugin.Common.Logger.Debug($"Verifying patch method: {patchMethod.DeclaringType.Name}.{patchMethod.Name}");
+            Plugin.Instance.Log.Debug($"Verifying patch method: {patchMethod.DeclaringType.Name}.{patchMethod.Name}");
 
             var methodPatch = patchMethod.GetCustomAttributes<HarmonyPatch>().FirstOrDefault();
             if (methodPatch == null)

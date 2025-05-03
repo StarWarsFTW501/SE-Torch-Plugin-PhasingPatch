@@ -26,32 +26,51 @@ namespace TorchPlugin
 {
     internal class MyPatchUtilities
     {
-        readonly static Dictionary<MyMissile, Task<(Vector3D, Vector3)?>> _collisionCorrectionTasks = new Dictionary<MyMissile, Task<(Vector3D, Vector3)?>>();
-        readonly static List<Vector3I> _missileDamageGridCells = new List<Vector3I>();
+        static Dictionary<MyMissile, Task<(Vector3D, Vector3)?>> _collisionCorrectionTasks;
 
-        readonly static FieldInfo _missileCollisionPointInfo = typeof(MyMissile).GetField("m_collisionPoint", BindingFlags.Instance | BindingFlags.NonPublic);
-        readonly static FieldInfo _missileCollisionNormalInfo = typeof(MyMissile).GetField("m_collisionNormal", BindingFlags.Instance | BindingFlags.NonPublic);
-        readonly static FieldInfo _missileCollidedEntityInfo = typeof(MyMissile).GetField("m_collidedEntity", BindingFlags.Instance | BindingFlags.NonPublic);
-        readonly static FieldInfo _missileCollisionShapeKey = typeof(MyMissile).GetField("m_collisionShapeKey", BindingFlags.Instance | BindingFlags.NonPublic);
+        readonly static List<Vector3I> _missileDamageGridCells;
 
-        readonly static MethodInfo _missileExplodeMethodInfo = typeof(MyMissile).GetMethod("Explode", BindingFlags.Instance | BindingFlags.NonPublic);
+        readonly static FieldInfo _missileCollisionPointInfo;
+        readonly static FieldInfo _missileCollisionNormalInfo;
+        readonly static FieldInfo _missileCollidedEntityInfo;
+        readonly static FieldInfo _missileCollisionShapeKey;
 
-        // Registers a phasing fix Task for missile
+        readonly static MethodInfo _missileExplodeMethodInfo;
+
+        static MyPatchUtilities()
+        {
+            _missileCollisionPointInfo = typeof(MyMissile).GetField("m_collisionPoint", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw GenerateMissingMemberException(typeof(MyMissile), "m_collisionPoint", MissingMemberVariant.Field);
+            _missileCollisionNormalInfo = typeof(MyMissile).GetField("m_collisionNormal", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw GenerateMissingMemberException(typeof(MyMissile), "m_collisionNormal", MissingMemberVariant.Field);
+            _missileCollidedEntityInfo = typeof(MyMissile).GetField("m_collidedEntity", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw GenerateMissingMemberException(typeof(MyMissile), "m_collidedEntity", MissingMemberVariant.Field);
+            _missileCollisionShapeKey = typeof(MyMissile).GetField("m_collisionShapeKey", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw GenerateMissingMemberException(typeof(MyMissile), "m_collisionShapeKey", MissingMemberVariant.Field);
+
+            _missileExplodeMethodInfo = typeof(MyMissile).GetMethod("Explode", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw GenerateMissingMemberException(typeof(MyMissile), "Explode", MissingMemberVariant.Method);
+
+            _collisionCorrectionTasks = new Dictionary<MyMissile, Task<(Vector3D, Vector3)?>>();
+            _missileDamageGridCells = new List<Vector3I>();
+        }
+
+
+        /// <summary>
+        /// Registers and starts a phasing patch <see cref="Task" /> for the given missile unless one is already registered.
+        /// </summary>
+        /// <param name="missile">Missile instance, the collision of which the <see cref="Task" /> will be correcting.</param>
         internal static void InitiatePhasingFix(MyMissile missile)
         {
             // This should never happen, but the phasing fix will not be used or have memory fall out of scope if the missile never executes MarkForExplosion, which it only does on servers
             if (!Sync.IsServer) return;
-
+            
             MyEntity collidedEntity = (MyEntity)_missileCollidedEntityInfo.GetValue(missile);
 
-            Vector3D position;
-            Vector3 normal;
-            Vector3D? pulledCollisionPoint;
-
             // Obtain previous missile position and the collision point subject to correction
-            position = missile.PositionComp.GetPosition();
-            normal = (Vector3)_missileCollisionNormalInfo.GetValue(missile);
-            pulledCollisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
+            Vector3D position = missile.PositionComp.GetPosition();
+            Vector3 normal = (Vector3)_missileCollisionNormalInfo.GetValue(missile);
+            Vector3D? pulledCollisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
 
             if (collidedEntity != null
                 && pulledCollisionPoint.HasValue
@@ -60,57 +79,6 @@ namespace TorchPlugin
                 && !grid.IsPreview
                 && grid.Projector == null)
             {
-                // All this stuff needs to be put into the Task but I can't be bothered with thread safety for things that won't be in the final build anyway
-
-
-
-                /* OLD CODE THAT WILL NO LONGER WORK BECAUSE CONCURRENCY
-#if DEBUG
-                Plugin.Instance.Log.Info($"Raycast distance set to {vectorMultiplier:0.000} m");
-                if ((bool)typeof(Commands).GetField("GPSSpam", BindingFlags.Static | BindingFlags.Public).GetValue(null))
-                {
-                    MyGpsCollection gpsCollection = (MyGpsCollection)MyAPIGateway.Session?.GPS;
-                    lock (gpsCollection)
-                    {
-                        MyGps gpsCollision = new MyGps
-                        {
-                            Coords = orthCollisionPoint,
-                            Name = "m_collisionPoint",
-                            DisplayName = "m_collisionPoint",
-                            GPSColor = Color.DarkRed,
-                            ShowOnHud = true
-                        };
-                        MyGps gpsPrevTick = new MyGps
-                        {
-                            Coords = position,
-                            Name = "lastTick",
-                            DisplayName = "lastTick",
-                            GPSColor = Color.Cyan,
-                            ShowOnHud = true
-                        };
-                        MyGps gpsCastFrom = new MyGps
-                        {
-                            Coords = orthCollisionPoint + globalSpaceDirection * vectorMultiplier,
-                            Name = "castFrom",
-                            DisplayName = "castFrom",
-                            GPSColor = Color.Gold,
-                            ShowOnHud = true
-                        };
-                        if (gpsCollection != null)
-                        {
-                            foreach (var player in MySession.Static.Players.GetOnlinePlayers())
-                            {
-                                gpsCollection.SendAddGpsRequest(player.Identity.IdentityId, ref gpsCollision);
-                                gpsCollection.SendAddGpsRequest(player.Identity.IdentityId, ref gpsPrevTick);
-                                gpsCollection.SendAddGpsRequest(player.Identity.IdentityId, ref gpsCastFrom);
-                            }
-                        }
-                    }
-                }
-#endif
-                */
-
-
                 // Start task calculating the corrected point and normal
                 var task = Task.Run(() =>
                 {
@@ -144,7 +112,7 @@ namespace TorchPlugin
 
 
                     // Take the corner which the direction points closest to, and make a relative vector from detected collision to the corner
-                    // (buffered by .3 blocks)
+                    // (padded by .3 blocks)
                     var gridSpaceRelativeRelevantCorner = new Vector3D(
                         gridSpaceDirection.X < 0 ? gridMin.X - .8 : gridMax.X + .8,
                         gridSpaceDirection.Y < 0 ? gridMin.Y - .8 : gridMax.Y + .8,
@@ -193,7 +161,10 @@ namespace TorchPlugin
                 _collisionCorrectionTasks[missile] = task;
             }
         }
-        // If any phasing fix was started for the given missile, synchronnously awaits its completion and applies the changes
+        /// <summary>
+        /// If any phasing patch <see cref="Task" /> was started for the given missile, synchronnously blocks until its completion and applies the patch.
+        /// </summary>
+        /// <param name="missile">Missile instance which the <see cref="Task" /> was related to.</param>
         internal static void CompletePhasingFix(MyMissile missile)
         {
             // Retrieve the task calculating this missile's correction point
@@ -213,11 +184,27 @@ namespace TorchPlugin
                 ClearPhasingFix(missile);
             }
         }
-        // Clean up reference to the task, available even if we aren't using it in the end
+        /// <summary>
+        /// Unregisters the phasing patch <see cref="Task" /> regardless of whether its output was used or not.
+        /// </summary>
+        /// <param name="missile">Missile instance which the <see cref="Task" /> was related to.</param>
         internal static void ClearPhasingFix(MyMissile missile)
         {
             _collisionCorrectionTasks.Remove(missile);
         }
+        /// <summary>
+        /// Unregisters all phasing patch <see cref="Task" />s. Intended for releasing memory when the plugin is disabled.
+        /// </summary>
+        internal static void ClearAllPhasingFixes()
+        {
+            _collisionCorrectionTasks = new Dictionary<MyMissile, Task<(Vector3D, Vector3)?>>();
+        }
+        /// <summary>
+        /// Applies missile damage to a single collided grid upon landing. Part of the damage patch.
+        /// </summary>
+        /// <param name="missile">Missile which is dealing damage.</param>
+        /// <param name="grid">Grid involved in the collision.</param>
+        /// <param name="nextPosition">The upcoming world space position of the missile in the next frame.</param>
         internal static void HitSingleGridWithMissile(MyMissile missile, MyCubeGrid grid, Vector3D nextPosition)
         {
             Vector3D? collisionPointNullable = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
@@ -302,6 +289,12 @@ namespace TorchPlugin
                 _missileDamageGridCells.Clear();
             }
         }
+        /// <summary>
+        /// Applies missile damage to multiple collided grids upon landing. Part of the damage patch.
+        /// </summary>
+        /// <param name="missile">Missile which is dealing damage.</param>
+        /// <param name="hits">Entities (grids) involved in the collision.</param>
+        /// <param name="nextPosition">The upcoming world space position of the missile in the next frame.</param>
         internal static void HitMultipleGridsWithMissile(MyMissile missile, List<MyLineSegmentOverlapResult<MyEntity>> hits, Vector3D nextPosition)
         {
             Vector3D? collisionPoint = (Vector3D?)_missileCollisionPointInfo.GetValue(missile);
@@ -330,21 +323,18 @@ namespace TorchPlugin
                         {
                             if (grid.TryGetCube(gridCell, out MyCube cube))
                             {
-                                // Maintain order in the list using binarysearch, sorting by distance from collision point
-                                int index = cubesToHit.BinarySearch(cube, Comparer<MyCube>.Create((x, y) => Vector3D.DistanceSquared(collisionPoint.Value, x.CubeBlock.WorldPosition).CompareTo(Vector3D.DistanceSquared(collisionPoint.Value, y.CubeBlock.WorldPosition))));
-                                cubesToHit.Insert(index < 0 ? ~index : index, cube);
-
-                                // We cannot assume that all blocks in a grid fall in a contiguous block of entries in the damage list
-                                // because there can be another grid between blocks of the first grid and vice versa
+                                cubesToHit.Add(cube);
                             }
                         }
-                        // Keen code would now sort the list in place - we don't have to as we maintained order
 #if DEBUG
                         hitCells += _missileDamageGridCells.Count;
 #endif
                         _missileDamageGridCells.Clear();
                     }
                 }
+
+                // Sort cubes by distance from the collision point rather than grid 
+                cubesToHit.SortNoAlloc((x, y) => Vector3D.DistanceSquared(collisionPoint.Value, x.CubeBlock.WorldPosition).CompareTo(Vector3D.DistanceSquared(collisionPoint.Value, y.CubeBlock.WorldPosition)));
 
 
                 // Construct the damage ray itself
@@ -354,7 +344,8 @@ namespace TorchPlugin
                 uint collisionShapeKey = (uint)_missileCollisionShapeKey.GetValue(missile);
                 Vector3 collisionNormal = (Vector3)_missileCollisionNormalInfo.GetValue(missile);
 
-                // Maintaining a list of already considered block IDs to not needlessly visit the same block twice, firing more raycasts
+                // Maintaining a list of already considered block IDs to not visit the same block twice, which could happen for multi-block structures since we don't check for duplicates in the list when creating it
+                // It is not actually a concern for damage because the whole multi-block would either have died from the shot, absorbed it (and thus stopped enumeration) or been missed by the raycast, but it would mean an extra raycast
                 HashSet<int> alreadyHitBlocks = new HashSet<int>();
 
                 foreach (MyCube cube in cubesToHit)
@@ -416,8 +407,17 @@ namespace TorchPlugin
 
 
 
-        // Raycast a cube's mesh. Optionally transform triangle data to get concrete point. True if intersected, false if not.
-        private static bool TryRayCastCube(MyCube cube, MyCubeGrid grid, ref LineD ray, out (Vector3D, Vector3)? result, bool generateIntersectionData = true, IntersectionFlags flags = IntersectionFlags.DIRECT_TRIANGLES)
+        /// <summary>
+        /// Raycasts a cube's mesh. Optionally transforms triangle data to get concrete intersection point.
+        /// </summary>
+        /// <param name="cube">Cube whose mesh to raycast.</param>
+        /// <param name="grid">Cube grid in which the raycast is being executed.</param>
+        /// <param name="ray">The line for which intersections are being queried.</param>
+        /// <param name="result">Concrete intersection point output. Point and mesh normal in world space. <see langword="null" /> if <c>generateIntersectionData</c> is <see langword="false"/>.</param>
+        /// <param name="generateIntersectionData">Whether or not to generate the intersection point output. The output will be <see langword="null"/> if set to <see langword="false"/>.</param>
+        /// <param name="flags">Intersection flags for the mesh query related to backface culling.</param>
+        /// <returns><see langword="true" /> if an intersection was found, <see langword="false" /> otherwise</returns>
+        private static bool TryRayCastCube(MyCube cube, MyCubeGrid grid, ref LineD ray, out (Vector3D Point, Vector3 Normal)? result, bool generateIntersectionData = true, IntersectionFlags flags = IntersectionFlags.DIRECT_TRIANGLES)
         {
             MySlimBlock slimBlock = cube.CubeBlock;
 
@@ -496,5 +496,37 @@ namespace TorchPlugin
                 return intersectedCube;
             }
         }
+        /// <summary>
+        /// Generates the appropriate exception outlining which member in which class was not found by reflection.
+        /// </summary>
+        /// <param name="targetType">The type expected to have this member.</param>
+        /// <param name="memberName">The name of the missing member.</param>
+        /// <param name="exceptionVariant">The variant of member that was expected.</param>
+        /// <returns>An appropriately typed exception with an appropriate explanation.</returns>
+        internal static MissingMemberException GenerateMissingMemberException(Type targetType, string memberName, MissingMemberVariant exceptionVariant)
+        {
+            string message = $"{Plugin.PluginName} reflection failure - {exceptionVariant} '{memberName}' in '{targetType.FullName}' not found!";
+            switch (exceptionVariant)
+            {
+                case MissingMemberVariant.Field:
+                    return new MissingFieldException(message);
+                case MissingMemberVariant.Method:
+                case MissingMemberVariant.Constructor:
+                    return new MissingMethodException(message);
+                default:
+                    return new MissingMemberException(message);
+            }
+        }
+    }
+    /// <summary>
+    /// Enum for declaring which variant of member is missing for exception generation.
+    /// </summary>
+    internal enum MissingMemberVariant
+    {
+        Field,
+        Method,
+        Property,
+        Constructor,
+        Operator
     }
 }

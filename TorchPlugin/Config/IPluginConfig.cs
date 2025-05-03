@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace Shared.Config
+namespace TorchPlugin.Config
 {
     public interface IPluginConfig : INotifyPropertyChanged
     {

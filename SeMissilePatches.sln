@@ -5,8 +5,6 @@ VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TorchPlugin", "TorchPlugin\TorchPlugin.csproj", "{6B5BC1C4-FD01-4E22-B024-AC1713BF7FDE}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared", "Shared\Shared.shproj", "{6B4E18DB-D8E6-4CEB-9D5D-B3D182C07587}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{75919FCB-E258-4690-ABD5-44597B3D9D65}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
@@ -32,9 +30,5 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FBE78E83-DC3B-45D2-AF77-CC60E700689A}
-	EndGlobalSection
-	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		Shared\Shared.projitems*{6b4e18db-d8e6-4ceb-9d5d-b3d182c07587}*SharedItemsImports = 13
-		Shared\Shared.projitems*{6b5bc1c4-fd01-4e22-b024-ac1713bf7fde}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal

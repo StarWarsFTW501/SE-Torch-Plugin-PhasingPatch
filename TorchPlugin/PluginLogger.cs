@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using NLog;
-using Shared.Logging;
+using TorchPlugin.Logging;
 
 namespace TorchPlugin
 {

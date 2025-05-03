@@ -17,7 +17,7 @@ using Sandbox;
 namespace ClientPlugin
 {
     [HarmonyPatch]
-    public class PhasingGamePatches
+    public class MyPatches
     {
         [HarmonyPostfix]
         [HarmonyPatch(typeof(MyMissile), "OnContactStart")]
