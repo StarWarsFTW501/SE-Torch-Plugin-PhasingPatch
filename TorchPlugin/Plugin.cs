@@ -25,7 +25,7 @@ namespace TorchPlugin
         public const string PluginName = "SeMissilePatches";
         public static Plugin Instance { get; private set; }
 
-        public long Tick { get; private set; }
+        //public long Tick { get; private set; }
 
         public IPluginLogger Log => Logger;
         private static readonly IPluginLogger Logger = new PluginLogger(PluginName);
@@ -42,7 +42,6 @@ namespace TorchPlugin
 
 
         private bool _initialized;
-        private bool _failed;
 
         // ReSharper disable once UnusedMember.Local
         // private readonly Commands commands = new Commands();
@@ -58,14 +57,12 @@ namespace TorchPlugin
             var configPath = Path.Combine(StoragePath, ConfigFileName);
             _config = PersistentConfig<PluginConfig>.Load(Log, configPath);
 
-            var gameVersionNumber = MyPerGameSettings.BasicGameInfo.GameVersion ?? 0;
-            var gameVersion = new StringBuilder(MyBuildNumbers.ConvertBuildNumberFromIntToString(gameVersionNumber)).ToString();
-
+            // Force-initialize reflection
             RuntimeHelpers.RunClassConstructor(typeof(MyPatchUtilities).TypeHandle);
 
             if (!PatchHelpers.HarmonyPatchAll(Log, new Harmony(Name)))
             {
-                _failed = true;
+                Log.Error("Harmony patch failure - could not initialize plugin!");
                 return;
             }
 
@@ -113,28 +110,6 @@ namespace TorchPlugin
             Instance = null;
 
             base.Dispose();
-        }
-
-        public override void Update()
-        {
-            if (_failed)
-                return;
-
-            try
-            {
-                CustomUpdate();
-                Tick++;
-            }
-            catch (Exception e)
-            {
-                Log.Critical(e, "Update failed");
-                _failed = true;
-            }
-        }
-
-        private void CustomUpdate()
-        {
-            // TODO: Put your update processing here. It is called on every simulation frame!
         }
     }
 }

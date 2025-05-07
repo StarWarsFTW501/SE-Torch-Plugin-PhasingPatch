@@ -1,5 +1,4 @@
 @echo off
-setlocal enabledelayedexpansion
 
 REM Check if the required parameters are passed
 REM (3rd param will be blank if there are not enough)
@@ -8,6 +7,7 @@ if "%~3" == "" (
     exit /b 1
 )
 
+setlocal disabledelayedexpansion
 REM Extract parameters and remove quotes
 set NAME=%~1
 set SOURCE=%~2
@@ -42,7 +42,9 @@ REM Copy the plugin into the plugin directory
 echo Copying "%NAME%" to "%PLUGIN_DIR%\"
 
 for /l %%i in (1, 1, 10) do (
+    setlocal disabledelayedexpansion
     copy /y "%SOURCE%\%NAME%" "%PLUGIN_DIR%\"
+    setlocal enabledelayedexpansion
 
     if !ERRORLEVEL! NEQ 0 (
         REM "timeout" requires input redirection which is not supported,
@@ -64,7 +66,9 @@ REM Copy Harmony into the plugin directory
 echo Copying "0Harmony.dll" to "%PLUGIN_DIR%\"
 
 for /l %%i in (1, 1, 10) do (
+    setlocal disabledelayedexpansion
     copy /y "%SOURCE%\0Harmony.dll" "%PLUGIN_DIR%\"
+    setlocal enabledelayedexpansion
 
     if !ERRORLEVEL! NEQ 0 (
         REM "timeout" requires input redirection which is not supported,
@@ -86,7 +90,9 @@ REM Copy the Manifest into the plugin directory
 echo Copying "manifest.xml" to "%PLUGIN_DIR%\"
 
 for /l %%i in (1, 1, 10) do (
+    setlocal disabledelayedexpansion
     copy /y "%SOURCE%\manifest.xml" "%PLUGIN_DIR%\"
+    setlocal enabledelayedexpansion
 
     if !ERRORLEVEL! NEQ 0 (
         REM "timeout" requires input redirection which is not supported,

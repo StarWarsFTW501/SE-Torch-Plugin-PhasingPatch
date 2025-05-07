@@ -59,8 +59,8 @@ namespace TorchPlugin
 
         // ReSharper disable once UnusedMember.Global
 
-        [Command("missilepatches help", "Displays the commands available for SeMissilePatches")]
-        [Permission(MyPromoteLevel.None)]
+        [Command("missilepatches help", "Displays the commands available for " + Plugin.PluginName)]
+        [Permission(MyPromoteLevel.Admin)]
         public void Help()
         {
             RespondWithHelp();
@@ -81,7 +81,7 @@ namespace TorchPlugin
             List<string> args = Context.Args;
             if (args.Count == 0)
             {
-                Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
+                Respond($"Patch for projectile phasing is {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
             }
             else if (args.Count == 1)
             {
@@ -89,7 +89,7 @@ namespace TorchPlugin
                 if (TryParseBool(args[0], out newValue))
                 {
                     Plugin.Instance.Config.Phasing = newValue;
-                    Respond($"Patch for projectile phasing {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
+                    Respond($"Patch for projectile phasing now {(Plugin.Instance.Config.Phasing ? "ON" : "OFF")}");
                 }
                 else Respond($"ERROR: Could not parse '{args[0]}' as a Boolean.");
             }
@@ -102,7 +102,7 @@ namespace TorchPlugin
             List<string> args = Context.Args;
             if (args.Count == 0)
             {
-                Respond($"Patch for projectile damage {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
+                Respond($"Patch for projectile damage is {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
             }
             else if (args.Count == 1)
             {
@@ -110,13 +110,13 @@ namespace TorchPlugin
                 if (TryParseBool(args[0], out newValue))
                 {
                     Plugin.Instance.Config.Damage = newValue;
-                    Respond($"Patch for projectile damage {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
+                    Respond($"Patch for projectile damage now {(Plugin.Instance.Config.Damage ? "ON" : "OFF")}");
                 }
                 else Respond($"ERROR: Could not parse '{args[0]}' as a Boolean.");
             }
             else Respond("ERROR: Invalid number of arguments.");
         }
-        [Command("missilepatches backmove", "Checks or changes the collision point back movement distance")]
+        [Command("missilepatches backmove", "Checks or changes the collision point back-movement distance (avoids clipping)")]
         [Permission(MyPromoteLevel.Admin)]
         public void BackMove()
         {

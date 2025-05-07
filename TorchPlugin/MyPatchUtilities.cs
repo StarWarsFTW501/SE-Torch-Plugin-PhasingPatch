@@ -501,12 +501,12 @@ namespace TorchPlugin
         /// </summary>
         /// <param name="targetType">The type expected to have this member.</param>
         /// <param name="memberName">The name of the missing member.</param>
-        /// <param name="exceptionVariant">The variant of member that was expected.</param>
+        /// <param name="memberVariant">The variant of member that was expected.</param>
         /// <returns>An appropriately typed exception with an appropriate explanation.</returns>
-        internal static MissingMemberException GenerateMissingMemberException(Type targetType, string memberName, MissingMemberVariant exceptionVariant)
+        internal static MissingMemberException GenerateMissingMemberException(Type targetType, string memberName, MissingMemberVariant memberVariant)
         {
-            string message = $"{Plugin.PluginName} reflection failure - {exceptionVariant} '{memberName}' in '{targetType.FullName}' not found!";
-            switch (exceptionVariant)
+            string message = $"{Plugin.PluginName} reflection failure - {memberVariant} '{memberName}' in '{targetType.FullName}' not found! Notify author and uninstall plugin until fixed.";
+            switch (memberVariant)
             {
                 case MissingMemberVariant.Field:
                     return new MissingFieldException(message);
